@@ -7,8 +7,49 @@ services:
     networks:
     - fase3net
 
-  # adicione os seus outros serviços aqui
-  # faça com que todos os serviços usem a mesma rede 'fase3net'
+  auth-db:
+    image: mysql:8.0
+    container_name: auth-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: authdb
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev
+    ports:
+      - "3307:3306"
+    volumes:
+      - auth_db_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fase3net
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    restart: always
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      JWT_SECRET: "ZGlmZmljdWx0eWZsYWdjbG9ja2NvbXBvdW5kYXV0aG9yc3BpZGVyZGl2aWRld3JhcHA="
+      SPRING_DATASOURCE_URL: jdbc:mysql://auth-db:3306/authdb
+      SPRING_DATASOURCE_USERNAME: dev
+      SPRING_DATASOURCE_PASSWORD: dev
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    networks:
+      - fase3net
 
 networks:
   fase3net:
+
+volumes:
+  auth_db_data:
