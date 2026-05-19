@@ -1,0 +1,4 @@
+br/com/restaurant/pagamento/application/usecase/HandleDltPaymentUseCaseTest.class
+br/com/restaurant/pagamento/domain/model/FailureReasonTest.class
+br/com/restaurant/pagamento/application/usecase/ProcessPaymentUseCaseTest.class
+br/com/restaurant/pagamento/infra/messaging/OrderCreatedConsumerIT.class

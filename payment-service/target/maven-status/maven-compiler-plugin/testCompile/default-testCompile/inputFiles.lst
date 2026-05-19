@@ -1,0 +1,4 @@
+/Users/_guifons/IdeaProjects/adjt-fase3-inicial/payment-service/src/test/java/br/com/restaurant/pagamento/application/usecase/HandleDltPaymentUseCaseTest.java
+/Users/_guifons/IdeaProjects/adjt-fase3-inicial/payment-service/src/test/java/br/com/restaurant/pagamento/application/usecase/ProcessPaymentUseCaseTest.java
+/Users/_guifons/IdeaProjects/adjt-fase3-inicial/payment-service/src/test/java/br/com/restaurant/pagamento/domain/model/FailureReasonTest.java
+/Users/_guifons/IdeaProjects/adjt-fase3-inicial/payment-service/src/test/java/br/com/restaurant/pagamento/infra/messaging/OrderCreatedConsumerIT.java

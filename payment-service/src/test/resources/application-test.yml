@@ -1,0 +1,3 @@
+procpag:
+  url: http://localhost:9999
+  timeout-ms: 1000
