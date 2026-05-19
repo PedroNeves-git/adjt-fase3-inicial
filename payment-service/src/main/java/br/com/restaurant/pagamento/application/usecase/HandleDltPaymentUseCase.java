@@ -11,12 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-/**
- * Processes messages that arrived at the Dead Letter Topic.
- * Makes ONE attempt at procpag. If approved → publishes pagamento.aprovado.
- * If failed → publishes pagamento.pendente (pedido-service updates status).
- * Never rethrows — avoids infinite loop on the DLT.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

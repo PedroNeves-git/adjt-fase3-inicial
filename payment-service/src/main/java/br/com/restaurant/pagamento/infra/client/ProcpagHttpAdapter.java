@@ -19,8 +19,6 @@ import java.math.BigDecimal;
  * Driven adapter — implements ExternalPaymentProcessorPort.
  * Fallback only classifies the failure and returns — no side effects.
  * The use case and DLT consumer decide what to do with the result.
- *
- * TODO: confirm exact endpoint with professors — using /payments as default
  */
 @Slf4j
 @Component
@@ -32,21 +30,23 @@ public class ProcpagHttpAdapter implements ExternalPaymentProcessorPort {
     @Value("${procpag.url:http://procpag:8089}")
     private String procpagUrl;
 
-    private static final String PAYMENTS_PATH = "/payments";
+    private static final String PAYMENTS_PATH = "/requisicao";
 
     @Override
     @CircuitBreaker(name = "procpag", fallbackMethod = "fallback")
     @Retry(name = "procpag")
     public ExternalPaymentResult process(String orderId, BigDecimal totalAmount) {
         log.info("[ProcpagHttpAdapter] Calling procpag. orderId={}", orderId);
-        ProcpagRequest request = new ProcpagRequest(orderId, totalAmount);
-        ProcpagResponse response = restTemplate.postForObject(
-                procpagUrl + PAYMENTS_PATH, request, ProcpagResponse.class);
+        ProcpagRequest request = new ProcpagRequest(orderId, totalAmount.longValue(), orderId);
+        restTemplate.postForObject(procpagUrl + PAYMENTS_PATH, request, String.class);
 
-        if (response != null && "APROVADO".equalsIgnoreCase(response.getStatus())) {
+        ProcpagResponse response = restTemplate.getForObject(
+                procpagUrl + PAYMENTS_PATH + "/" + orderId, ProcpagResponse.class);
+
+        if (response != null && "pago".equalsIgnoreCase(response.getStatus())) {
             log.info("[ProcpagHttpAdapter] Approved. orderId={}, transactionId={}",
-                    orderId, response.getTransacaoId());
-            return ExternalPaymentResult.approved(response.getTransacaoId());
+                    orderId, response.getPagamentoId());
+            return ExternalPaymentResult.approved(response.getPagamentoId());
         }
 
         log.warn("[ProcpagHttpAdapter] Non-approved response. orderId={}", orderId);

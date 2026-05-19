@@ -19,6 +19,7 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.ExponentialBackOff;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -74,9 +75,10 @@ public class KafkaConfig {
         // Sends to <topic>-dlt after retries are exhausted; preserves original message key
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
 
-        // Exponential backoff: 1s → 2s → 4s → 8s (4 retries after initial attempt = 5 total)
+        // Exponential backoff: 1s → 2s → 4s (3 retries after initial attempt = 4 total)
+        // After 4 attempts the message is sent to pedido.criado-dlt
         ExponentialBackOff backOff = new ExponentialBackOff(1_000L, 2.0);
-        backOff.setMaxAttempts(4);
+        backOff.setMaxAttempts(3);
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
@@ -92,12 +94,29 @@ public class KafkaConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>
-    orderCreatedListenerContainerFactory() {
+    orderCreatedListenerContainerFactory(DefaultErrorHandler errorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(orderCreatedConsumerFactory());
-        factory.setCommonErrorHandler(errorHandler(kafkaTemplate()));
+        factory.setCommonErrorHandler(errorHandler);
         // AckMode RECORD: commit offset only after listener returns without exception
+        factory.getContainerProperties().setAckMode(AckMode.RECORD);
+        return factory;
+    }
+
+    // ─── DLT Listener Container Factory ──────────────────────────────────────
+    // Separate factory for the DLT consumer:
+    // - NO DeadLetterPublishingRecoverer (prevents DLT-of-DLT infinite loop)
+    // - FixedBackOff(0, 0) = fail immediately, no retry
+    //   HandleDltPaymentUseCase never rethrows, so this path is never reached in practice.
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>
+    dltListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(orderCreatedConsumerFactory());
+        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(0L, 0L)));
         factory.getContainerProperties().setAckMode(AckMode.RECORD);
         return factory;
     }

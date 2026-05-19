@@ -1,13 +1,16 @@
 package br.com.restaurant.pagamento.infra.client.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.math.BigDecimal;
 
 @Data
 @AllArgsConstructor
 public class ProcpagRequest {
-    private String pedidoId;
-    private BigDecimal valor;
+    @JsonProperty("pagamento_id")
+    private String pagamentoId;
+    @JsonProperty("valor")
+    private long valor;
+    @JsonProperty("cliente_id")
+    private String clienteId;
 }

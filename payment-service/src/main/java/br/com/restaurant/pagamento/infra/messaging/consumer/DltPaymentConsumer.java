@@ -23,7 +23,7 @@ public class DltPaymentConsumer {
     @KafkaListener(
             topics = "pedido.criado-dlt",
             groupId = "pagamento-service-dlt",
-            containerFactory = "orderCreatedListenerContainerFactory"
+            containerFactory = "dltListenerContainerFactory"
     )
     public void onDlt(OrderCreatedEvent event) {
         log.warn("[DltPaymentConsumer] DLT message received. orderId={}", event.getOrderId());
