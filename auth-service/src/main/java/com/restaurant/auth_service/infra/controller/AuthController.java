@@ -28,6 +28,7 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest request) {
         try {
+
             Authentication auth = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.email(),
@@ -35,7 +36,9 @@ public class AuthController {
                     )
             );
 
-            String token = jwtService.generateToken(auth.getName());
+            String token = jwtService.generateToken(
+                    auth.getName()
+            );
 
             return new LoginResponse(
                     token,
