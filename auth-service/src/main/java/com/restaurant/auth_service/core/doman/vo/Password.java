@@ -36,9 +36,4 @@ public record Password(String value) {
 
         this.value = normalized;
     }
-
-    @Override
-    public String toString() {
-        return "Password(****)";
-    }
 }

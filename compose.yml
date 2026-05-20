@@ -40,7 +40,7 @@ services:
         - "8081:8081"
       environment:
         SERVER_PORT: 8081
-        JWT_SECRET: "ZGlmZmljdWx0eWZsYWdjbG9ja2NvbXBvdW5kYXV0aG9yc3BpZGVyZGl2aWRld3JhcHA="                                     
+        JWT_SECRET: "bWluaGEtY2hhdmUtc3VwZXItc2VjcmV0YS1jb20tbWFpcy1kZS0zMi1jYXJhY3RlcmVz"
         SPRING_DATASOURCE_URL: jdbc:mysql://auth-db:3306/authdb                                                                
         SPRING_DATASOURCE_USERNAME: dev                                                                                        
         SPRING_DATASOURCE_PASSWORD: dev                                                                                        
