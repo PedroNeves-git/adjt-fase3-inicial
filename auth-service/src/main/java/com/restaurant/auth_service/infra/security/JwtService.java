@@ -1,12 +1,13 @@
 package com.restaurant.auth_service.infra.security;
 
+import com.restaurant.auth_service.core.doman.enums.Role;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,14 +22,16 @@ public class JwtService {
     private String secret;
 
     private Key key() {
-        return Keys.hmacShaKeyFor(
-                secret.getBytes(StandardCharsets.UTF_8)
-        );
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String subject) {
+    public String generateToken(Long id, String email, Role role) {
         return Jwts.builder()
-                .subject(subject) // email
+                .subject(email)
+                .claim("userId", id)
+                .claim("userRole", role)
                 .issuedAt(new Date())
                 .expiration(Date.from(genExpirateDate()))
                 .signWith(key())
