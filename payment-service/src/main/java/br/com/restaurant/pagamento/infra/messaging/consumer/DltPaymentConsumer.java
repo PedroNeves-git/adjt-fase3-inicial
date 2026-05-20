@@ -22,7 +22,7 @@ public class DltPaymentConsumer {
 
     @KafkaListener(
             topics = "pedido.criado.DLT",
-            groupId = "pagamento-service-dlt",
+            groupId = "payment-service-dlt",
             containerFactory = "dltListenerContainerFactory"
     )
     public void onDlt(OrderCreatedEvent event) {
