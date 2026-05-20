@@ -1,5 +1,6 @@
 package com.restaurant.order_service.order.core.dto.event;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.restaurant.order_service.order.core.domain.Order;
 import com.restaurant.order_service.order.core.domain.OrderItem;
 
@@ -9,23 +10,23 @@ import java.util.List;
 import java.util.UUID;
 
 public record OrderCreatedEvent(
-        UUID eventId,
-        String eventType,
-        Instant timestamp,
-        UUID orderId,
-        Long clientId,
-        UUID restaurantId,
-        BigDecimal totalAmount,
-        List<Item> items
+        @JsonProperty("eventId")       UUID eventId,
+        @JsonProperty("eventType")     String eventType,
+        @JsonProperty("timestamp")     Instant timestamp,
+        @JsonProperty("pedidoId")      UUID orderId,
+        @JsonProperty("clienteId")     Long clientId,
+        @JsonProperty("restauranteId") UUID restaurantId,
+        @JsonProperty("valorTotal")    BigDecimal totalAmount,
+        @JsonProperty("itens")         List<Item> items
 ) {
 
-    public static final String EVENT_TYPE = "ORDER_CREATED";
+    public static final String EVENT_TYPE = "PEDIDO_CRIADO";
 
     public record Item(
-            UUID menuItemId,
-            String name,
-            int quantity,
-            BigDecimal unitPrice
+            @JsonProperty("produtoId")     UUID menuItemId,
+            @JsonProperty("nome")          String name,
+            @JsonProperty("quantidade")    int quantity,
+            @JsonProperty("precoUnitario") BigDecimal unitPrice
     ) { }
 
     public static OrderCreatedEvent from(Order order) {
