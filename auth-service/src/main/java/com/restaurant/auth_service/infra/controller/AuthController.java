@@ -2,6 +2,7 @@ package com.restaurant.auth_service.infra.controller;
 
 import com.restaurant.auth_service.infra.dto.LoginRequest;
 import com.restaurant.auth_service.infra.dto.LoginResponse;
+import com.restaurant.auth_service.infra.entity.UserEntity;
 import com.restaurant.auth_service.infra.security.JwtService;
 import com.restaurant.auth_service.infra.security.exception.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,6 +29,7 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest request) {
         try {
+
             Authentication auth = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.email(),
@@ -35,7 +37,13 @@ public class AuthController {
                     )
             );
 
-            String token = jwtService.generateToken(auth.getName());
+            UserEntity user = (UserEntity) auth.getPrincipal();
+
+            String token = jwtService.generateToken(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getRole()
+            );
 
             return new LoginResponse(
                     token,
