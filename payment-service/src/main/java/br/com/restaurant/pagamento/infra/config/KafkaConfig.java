@@ -58,7 +58,7 @@ public class KafkaConfig {
     public ConsumerFactory<String, OrderCreatedEvent> orderCreatedConsumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "pagamento-service");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "payment-service");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         // Manual commit — offset committed only after successful listener return
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);

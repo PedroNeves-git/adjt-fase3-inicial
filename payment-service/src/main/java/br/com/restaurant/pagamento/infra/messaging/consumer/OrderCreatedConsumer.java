@@ -21,7 +21,7 @@ public class OrderCreatedConsumer {
 
     @KafkaListener(
             topics = "${kafka.topics.pedido-criado}",
-            groupId = "pagamento-service",
+            groupId = "payment-service",
             containerFactory = "orderCreatedListenerContainerFactory"
     )
     public void onOrderCreated(OrderCreatedEvent event) {

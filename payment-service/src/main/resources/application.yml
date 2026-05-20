@@ -1,6 +1,6 @@
 spring:
   application:
-    name: pagamento-service
+    name: payment-service
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -58,7 +58,4 @@ logging:
   level:
     br.com.restaurant: DEBUG
     org.springframework.kafka: INFO
-    # "Error handler threw an exception" is normal Spring Kafka retry behavior —
-    # the container logs KafkaException at ERROR level on every seek-to-retry.
-    # Setting WARN here hides that noise without losing real errors.
     org.springframework.kafka.listener.KafkaMessageListenerContainer: WARN
