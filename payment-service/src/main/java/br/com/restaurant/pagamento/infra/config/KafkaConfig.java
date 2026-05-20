@@ -1,6 +1,7 @@
 package br.com.restaurant.pagamento.infra.config;
 
 import br.com.restaurant.pagamento.infra.messaging.consumer.dto.OrderCreatedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -24,6 +25,7 @@ import org.springframework.util.backoff.FixedBackOff;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @EnableKafka
 @Configuration
 public class KafkaConfig {
@@ -71,23 +73,49 @@ public class KafkaConfig {
     // ─── Error Handler with Retry + DLT ──────────────────────────────────────
 
     @Bean
-    public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
-        // Sends to <topic>-dlt after retries are exhausted; preserves original message key
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
+    public DefaultErrorHandler errorHandler(
+            KafkaTemplate<String, Object> kafkaTemplate) {
 
-        // Exponential backoff: 1s → 2s → 4s (3 retries after initial attempt = 4 total)
-        // After 4 attempts the message is sent to pedido.criado-dlt
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(kafkaTemplate) {
+                    @Override
+                    public void accept(
+                            org.apache.kafka.clients.consumer.ConsumerRecord<?, ?> record,
+                            org.apache.kafka.clients.consumer.Consumer<?, ?> consumer,
+                            Exception exception) {
+                        try {
+                            super.accept(record, consumer, exception);
+                            log.info("[KafkaConfig] Mensagem enviada ao DLT com sucesso. topic={}, offset={}", record.topic(), record.offset());
+                        } catch (Exception e) {
+                            // Se falhar ao publicar no DLT, loga e descarta para não reiniciar o ciclo de retries
+                            log.error("[KafkaConfig] Falha ao publicar no DLT. topic={}, offset={}, erro={}", record.topic(), record.offset(), e.getMessage());
+                        }
+                    }
+                };
+
         ExponentialBackOff backOff = new ExponentialBackOff(1_000L, 2.0);
-        backOff.setMaxAttempts(3);
+        backOff.setMaxAttempts(4);
 
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
-
-        // Deserialization errors go straight to DLT — retrying won't fix a bad payload
-        errorHandler.addNotRetryableExceptions(
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
+        handler.addNotRetryableExceptions(
                 org.springframework.kafka.support.serializer.DeserializationException.class
         );
 
-        return errorHandler;
+        // Handler para tratar exception que aparece enquanto retry está ocorrendo
+        handler.setLogLevel(org.springframework.kafka.KafkaException.Level.WARN);
+        handler.setRetryListeners((record, ex, deliveryAttempt) ->
+                log.warn("[KafkaConfig] Retry {}/{} para orderId={}. Motivo: {}",
+                        deliveryAttempt,
+                        backOff.getMaxAttempts() + 1,
+                        record.key(),
+                        ex.getMessage())
+        );
+
+        handler.addNotRetryableExceptions(
+                org.springframework.kafka.support.serializer.DeserializationException.class
+        );
+
+        return handler;
     }
 
     // ─── Listener Container Factory ───────────────────────────────────────────
@@ -105,10 +133,6 @@ public class KafkaConfig {
     }
 
     // ─── DLT Listener Container Factory ──────────────────────────────────────
-    // Separate factory for the DLT consumer:
-    // - NO DeadLetterPublishingRecoverer (prevents DLT-of-DLT infinite loop)
-    // - FixedBackOff(0, 0) = fail immediately, no retry
-    //   HandleDltPaymentUseCase never rethrows, so this path is never reached in practice.
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent>
@@ -136,7 +160,7 @@ public class KafkaConfig {
     @Bean
     public NewTopic topicOrderCreatedDlt() {
         // Declared explicitly to guarantee correct configuration
-        return new NewTopic("pedido.criado-dlt", 1, (short) 1);
+        return new NewTopic("pedido.criado.DLT", 1, (short) 1);
     }
 
     @Bean

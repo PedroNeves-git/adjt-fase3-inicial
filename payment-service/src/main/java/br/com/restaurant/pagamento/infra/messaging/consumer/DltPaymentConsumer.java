@@ -21,7 +21,7 @@ public class DltPaymentConsumer {
     private final HandleDltPaymentInputPort handleDltPayment;
 
     @KafkaListener(
-            topics = "pedido.criado-dlt",
+            topics = "pedido.criado.DLT",
             groupId = "pagamento-service-dlt",
             containerFactory = "dltListenerContainerFactory"
     )
