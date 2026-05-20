@@ -75,7 +75,7 @@ class KafkaOrderEventPublisherIntegrationTest {
 
             OrderCreatedEvent event = record.value();
             assertThat(event.eventId()).isNotNull();
-            assertThat(event.eventType()).isEqualTo("ORDER_CREATED");
+            assertThat(event.eventType()).isEqualTo("PEDIDO_CRIADO");
             assertThat(event.timestamp()).isNotNull();
             assertThat(event.orderId()).isEqualTo(orderId);
             assertThat(event.clientId()).isEqualTo(42L);
