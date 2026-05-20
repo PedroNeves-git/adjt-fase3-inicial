@@ -1,0 +1,572 @@
+{
+	"info": {
+		"_postman_id": "a8b1f3c4-1111-2222-3333-444444444444",
+		"name": "Restaurant Phase 3 - End-to-End Tests",
+		"description": "End-to-end test collection for the Phase 3 challenge.\n\nServices: auth-service, order-service, payment-service, procpag (external), Kafka.\n\nMain flow:\n1. Register a client (auth-service)\n2. Login -> token saved into {{token}}\n3. Browse the menu\n4. Create an order -> orderId saved into {{order_id}}\n5. Confirm the order -> event 'pedido.criado' published to Kafka\n6. payment-service consumes, calls procpag (with Resilience4j) and publishes 'pagamento.aprovado'\n7. order-service consumes 'pagamento.aprovado' and updates status to PAID\n8. GET order -> status is PAID\n\nMonitoring (payment-service Actuator):\n- /actuator/health\n- /actuator/circuitbreakers (Resilience4j state)\n- /actuator/retries (Resilience4j metrics)\n\nRequires: docker compose up.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. Health",
+			"item": [
+				{
+					"name": "GET order-service health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_base}}/actuator/health",
+							"host": ["{{order_base}}"],
+							"path": ["actuator", "health"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET auth-service swagger",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{auth_base}}/swagger-ui/index.html",
+							"host": ["{{auth_base}}"],
+							"path": ["swagger-ui", "index.html"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET payment-service health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{payment_base}}/actuator/health",
+							"host": ["{{payment_base}}"],
+							"path": ["actuator", "health"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "1. Auth",
+			"item": [
+				{
+					"name": "POST Register Client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Pedro Test\",\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"role\": \"CLIENT\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_base}}/users",
+							"host": ["{{auth_base}}"],
+							"path": ["users"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Created (2xx) or Conflict (409 if already exists)', function () {",
+									"    pm.expect([200, 201, 409, 400]).to.include(pm.response.code);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Login (saves token)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_base}}/auth/login",
+							"host": ["{{auth_base}}"],
+							"path": ["auth", "login"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Has accessToken', () => pm.expect(body.accessToken).to.be.a('string'));",
+									"pm.collectionVariables.set('token', body.accessToken);",
+									"console.log('Token saved (length ' + body.accessToken.length + ')');"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "2. Menu",
+			"item": [
+				{
+					"name": "GET List menu items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/menu-items",
+							"host": ["{{order_base}}"],
+							"path": ["menu-items"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const items = pm.response.json();",
+									"pm.test('Has 12 active items', () => pm.expect(items.length).to.eql(12));",
+									"pm.test('All items are active', () => items.forEach(i => pm.expect(i.active).to.be.true));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "3. Orders",
+			"item": [
+				{
+					"name": "POST Create order (saves order_id)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"restaurantId\": \"{{restaurant_id}}\",\n    \"items\": [\n        { \"menuItemId\": \"{{menu_item_burger}}\", \"quantity\": 2 },\n        { \"menuItemId\": \"{{menu_item_coke}}\",   \"quantity\": 1 }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{order_base}}/orders",
+							"host": ["{{order_base}}"],
+							"path": ["orders"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 201', () => pm.response.to.have.status(201));",
+									"const body = pm.response.json();",
+									"pm.test('Status is AWAITING_CONFIRMATION', () => pm.expect(body.status).to.eql('AWAITING_CONFIRMATION'));",
+									"pm.test('Has computed totalAmount', () => pm.expect(Number(body.totalAmount)).to.be.greaterThan(0));",
+									"pm.test('Has 2 items', () => pm.expect(body.items.length).to.eql(2));",
+									"pm.collectionVariables.set('order_id', body.id);",
+									"console.log('Order created with id ' + body.id + ', total ' + body.totalAmount);"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Confirm order (publishes pedido.criado)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/orders/{{order_id}}/confirm",
+							"host": ["{{order_base}}"],
+							"path": ["orders", "{{order_id}}", "confirm"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"pm.test('Status is PENDING_PAYMENT', () => pm.expect(body.status).to.eql('PENDING_PAYMENT'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Order by id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/orders/{{order_id}}",
+							"host": ["{{order_base}}"],
+							"path": ["orders", "{{order_id}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"console.log('Current order status: ' + pm.response.json().status);"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET My orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/orders",
+							"host": ["{{order_base}}"],
+							"path": ["orders"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Order by id (expect PAID after payment-service processes)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/orders/{{order_id}}",
+							"host": ["{{order_base}}"],
+							"path": ["orders", "{{order_id}}"]
+						},
+						"description": "Run this 3-10 seconds AFTER 'POST Confirm order'. The payment-service should have consumed pedido.criado, called procpag and published pagamento.aprovado, which is then consumed by order-service to mark the order as PAID."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const status = pm.response.json().status;",
+									"console.log('Current order status: ' + status);",
+									"pm.test('Eventually PAID (re-run if still PENDING_PAYMENT)', function () {",
+									"    pm.expect(status).to.be.oneOf(['PAID', 'PENDING_PAYMENT']);",
+									"    if (status === 'PENDING_PAYMENT') {",
+									"        console.warn('Still PENDING_PAYMENT — payment-service may still be processing. Wait a few seconds and rerun.');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "4. Payment monitoring (Resilience4j)",
+			"item": [
+				{
+					"name": "GET payment-service Circuit Breakers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{payment_base}}/actuator/circuitbreakers",
+							"host": ["{{payment_base}}"],
+							"path": ["actuator", "circuitbreakers"]
+						},
+						"description": "Shows the state of all Circuit Breakers managed by Resilience4j. The 'procpag' CB protects calls to the external payment provider. States: CLOSED (normal), OPEN (too many failures, blocking calls), HALF_OPEN (test recovery)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const body = pm.response.json();",
+									"console.log('CircuitBreakers: ' + JSON.stringify(body, null, 2));",
+									"pm.test('procpag circuit breaker registered', function () {",
+									"    pm.expect(body.circuitBreakers).to.have.property('procpag');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET payment-service Retries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{payment_base}}/actuator/retries",
+							"host": ["{{payment_base}}"],
+							"path": ["actuator", "retries"]
+						},
+						"description": "Shows Resilience4j Retry instances. The 'procpag' retry runs up to 2 attempts on IOException/ConnectException/ResourceAccessException with 300ms backoff."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"console.log(JSON.stringify(pm.response.json(), null, 2));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "5. Error scenarios",
+			"item": [
+				{
+					"name": "POST Create order - no token (expect 401/403)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"restaurantId\": \"{{restaurant_id}}\",\n    \"items\": [ { \"menuItemId\": \"{{menu_item_burger}}\", \"quantity\": 1 } ]\n}"
+						},
+						"url": {
+							"raw": "{{order_base}}/orders",
+							"host": ["{{order_base}}"],
+							"path": ["orders"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Rejected (401 or 403)', () => pm.expect([401, 403]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Create order - empty items (expect 400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"restaurantId\": \"{{restaurant_id}}\",\n    \"items\": []\n}"
+						},
+						"url": {
+							"raw": "{{order_base}}/orders",
+							"host": ["{{order_base}}"],
+							"path": ["orders"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 400', () => pm.response.to.have.status(400));",
+									"pm.test('Error is ValidationError', () => pm.expect(pm.response.json().error).to.eql('ValidationError'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Order by random id (expect 404)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{order_base}}/orders/00000000-0000-0000-0000-000000000000",
+							"host": ["{{order_base}}"],
+							"path": ["orders", "00000000-0000-0000-0000-000000000000"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 404', () => pm.response.to.have.status(404));"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "auth_base",
+			"value": "http://localhost:8081/api-users/v1"
+		},
+		{
+			"key": "order_base",
+			"value": "http://localhost:8082/api-orders/v1"
+		},
+		{
+			"key": "payment_base",
+			"value": "http://localhost:8083"
+		},
+		{
+			"key": "email",
+			"value": "pedro@test.com"
+		},
+		{
+			"key": "password",
+			"value": "Senha@123"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "order_id",
+			"value": ""
+		},
+		{
+			"key": "restaurant_id",
+			"value": "11111111-1111-1111-1111-111111111111"
+		},
+		{
+			"key": "menu_item_burger",
+			"value": "a0000001-0000-0000-0000-000000000001"
+		},
+		{
+			"key": "menu_item_coke",
+			"value": "a0000003-0000-0000-0000-000000000001"
+		}
+	]
+}
