@@ -2,13 +2,13 @@ package com.restaurant.order_service.security;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 
@@ -17,15 +17,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JwtTokenValidatorTest {
 
-    private static final String SECRET = "ZGlmZmljdWx0eWZsYWdjbG9ja2NvbXBvdW5kYXV0aG9yc3BpZGVyZGl2aWRld3JhcHA=";
-    private static final String WRONG_SECRET = "wrongsecretwrongsecretwrongsecretwrongsecret";
+    private static final String SECRET = "bWluaGEtY2hhdmUtc3VwZXItc2VjcmV0YS1jb20tbWFpcy1kZS0zMi1jYXJhY3RlcmVz";
+    private static final String WRONG_SECRET = "d3Jvbmcta2V5LWZvci10ZXN0LXdpdGgtMzItcGx1cy1jaGFycy1wYWRkaW5n";
 
     private SecretKey key;
     private JwtTokenValidator validator;
 
     @BeforeEach
     void setUp() {
-        key = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        key = new SecretKeySpec(Decoders.BASE64.decode(SECRET), "HmacSHA256");
         validator = new JwtTokenValidator(SECRET);
     }
 
@@ -43,7 +43,7 @@ class JwtTokenValidatorTest {
     void extractsAllClaimsWhenPresent() {
         String token = generateToken(
                 "pedro@example.com",
-                Map.of("userId", 42L, "role", "CLIENT"),
+                Map.of("userId", 42L, "userRole", "CLIENT"),
                 key
         );
 
@@ -59,7 +59,7 @@ class JwtTokenValidatorTest {
     void uppercasesRole() {
         String token = generateToken(
                 "pedro@example.com",
-                Map.of("userId", 1L, "role", "client"),
+                Map.of("userId", 1L, "userRole", "client"),
                 key
         );
 
@@ -71,7 +71,7 @@ class JwtTokenValidatorTest {
     void fallsBackOnMissingUserId() {
         String token = generateToken(
                 "pedro@example.com",
-                Map.of("role", "CLIENT"),
+                Map.of("userRole", "CLIENT"),
                 key
         );
 
@@ -109,8 +109,8 @@ class JwtTokenValidatorTest {
     @Test
     @DisplayName("rejects token signed with a different secret")
     void rejectsWrongSignature() {
-        SecretKey wrong = new SecretKeySpec(WRONG_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        String token = generateToken("x", Map.of("userId", 1L, "role", "CLIENT"), wrong);
+        SecretKey wrong = new SecretKeySpec(Decoders.BASE64.decode(WRONG_SECRET), "HmacSHA256");
+        String token = generateToken("x", Map.of("userId", 1L, "userRole", "CLIENT"), wrong);
 
         assertThatThrownBy(() -> validator.validateAndExtract(token))
                 .isInstanceOf(JwtException.class);

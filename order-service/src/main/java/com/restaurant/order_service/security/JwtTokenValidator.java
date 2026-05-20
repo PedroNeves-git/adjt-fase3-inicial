@@ -2,6 +2,7 @@ package com.restaurant.order_service.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class JwtTokenValidator {
@@ -19,10 +19,8 @@ public class JwtTokenValidator {
     private final SecretKey key;
 
     public JwtTokenValidator(@Value("${security.jwt.secret}") String secret) {
-        this.key = new SecretKeySpec(
-                secret.getBytes(StandardCharsets.UTF_8),
-                "HmacSHA256"
-        );
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        this.key = new SecretKeySpec(keyBytes, "HmacSHA256");
     }
 
     public AuthenticatedClient validateAndExtract(String token) {
@@ -51,7 +49,7 @@ public class JwtTokenValidator {
     }
 
     private String resolveRole(Claims claims) {
-        Object raw = claims.get("role");
+        Object raw = claims.get("userRole");
         if (raw == null) {
             return "CLIENT";
         }
