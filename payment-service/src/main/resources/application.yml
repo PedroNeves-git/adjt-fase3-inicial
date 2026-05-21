@@ -18,6 +18,7 @@ resilience4j:
     instances:
       procpag:
         sliding-window-size: 10
+        minimum-number-of-calls: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 10s
         permitted-number-of-calls-in-half-open-state: 2
@@ -27,10 +28,6 @@ resilience4j:
       procpag:
         max-attempts: 2
         wait-duration: 300ms
-        retry-exceptions:
-          - java.io.IOException
-          - java.net.ConnectException
-          - org.springframework.web.client.ResourceAccessException
   timelimiter:
     instances:
       procpag:
