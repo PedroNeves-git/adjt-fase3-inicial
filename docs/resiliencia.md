@@ -27,7 +27,7 @@ graph TD
     
     %% Ramificação de Sucesso
     E -- Sim --> F[pagamento.aprovado]:::success
-    F --> G[payment-service<br>atualiza]:::process
+    F --> G[order-service<br>atualiza]:::process
     
     %% Ramificação de Falha / Resiliência
     E -- Não --> H{circuit breaker<br>aberto?}:::decision
